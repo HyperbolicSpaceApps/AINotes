@@ -24,13 +24,14 @@ class ThoughtAdapter extends TypeAdapter<Thought> {
       folder: fields[4] as String?,
       createdAt: fields[5] as DateTime?,
       updatedAt: fields[6] as DateTime?,
+      embedding: (fields[7] as List?)?.cast<double>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Thought obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -44,7 +45,9 @@ class ThoughtAdapter extends TypeAdapter<Thought> {
       ..writeByte(5)
       ..write(obj.createdAt)
       ..writeByte(6)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(7)
+      ..write(obj.embedding);
   }
 
   @override

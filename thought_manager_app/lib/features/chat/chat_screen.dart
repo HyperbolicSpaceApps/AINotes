@@ -25,8 +25,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _initSpeech() async {
-    _speechAvailable = await _speechToText.initialize();
-    setState(() {});
+    _speechAvailable = await _speechToText.initialize(
+      onError: (e) => debugPrint('Speech error: $e'),
+    );
+    if (mounted) setState(() {});
   }
 
   void _scrollToBottom() {
@@ -73,7 +75,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final messages = ref.watch(chatProvider);
     final isThinking = ref.watch(chatProvider.notifier).isThinking;
-    final hasApiKey = ref.watch(apiKeyProvider).isNotEmpty;
+    final hasApiKey = ref.watch(groqApiKeyProvider).isNotEmpty;
     final isListening = ref.watch(isListeningProvider);
 
     // Scroll when new messages arrive
@@ -324,13 +326,13 @@ class _InputBar extends StatelessWidget {
               minLines: 1,
               decoration: InputDecoration(
                 hintText: 'Add a note, ask a question…',
-                hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 15),
+                hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 15),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(20),
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: Colors.grey.shade100,
+                fillColor: Colors.grey.shade800,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),

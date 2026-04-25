@@ -4,6 +4,7 @@ import 'thought_agent.dart';
 import '../models/chat_message.dart';
 import '../models/thought.dart';
 import '../storage/thought_repository.dart';
+import '../embeddings/embedding_service.dart';
 
 // ── Repository ────────────────────────────────────────────────────────────────
 
@@ -11,16 +12,16 @@ final thoughtRepositoryProvider = Provider<ThoughtRepository>((ref) {
   throw UnimplementedError('Must be overridden in main() after Hive init');
 });
 
-// ── API Key ───────────────────────────────────────────────────────────────────
+// ── API Keys ──────────────────────────────────────────────────────────────────
 
-final apiKeyProvider = StateNotifierProvider<ApiKeyNotifier, String>((ref) {
-  return ApiKeyNotifier();
+final groqApiKeyProvider = StateNotifierProvider<GroqApiKeyNotifier, String>((ref) {
+  return GroqApiKeyNotifier();
 });
 
-class ApiKeyNotifier extends StateNotifier<String> {
+class GroqApiKeyNotifier extends StateNotifier<String> {
   static const _prefsKey = 'groq_api_key';
 
-  ApiKeyNotifier() : super('') {
+  GroqApiKeyNotifier() : super('') {
     _load();
   }
 
@@ -36,16 +37,53 @@ class ApiKeyNotifier extends StateNotifier<String> {
   }
 }
 
+final jinaApiKeyProvider = StateNotifierProvider<JinaApiKeyNotifier, String>((ref) {
+  return JinaApiKeyNotifier();
+});
+
+class JinaApiKeyNotifier extends StateNotifier<String> {
+  static const _prefsKey = 'jina_api_key';
+
+  JinaApiKeyNotifier() : super('') {
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getString(_prefsKey) ?? '';
+  }
+
+  Future<void> set(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKey, key);
+    state = key;
+  }
+}
+
+// ── Embedding service ─────────────────────────────────────────────────────────
+
+final embeddingServiceProvider = Provider<EmbeddingService?>((ref) {
+  final key = ref.watch(jinaApiKeyProvider);
+  if (key.isEmpty) return null;
+  return EmbeddingService(apiKey: key);
+});
+
 // ── Agent ─────────────────────────────────────────────────────────────────────
 
 final agentProvider = Provider<ThoughtAgent?>((ref) {
-  final key = ref.watch(apiKeyProvider);
+  final groqKey = ref.watch(groqApiKeyProvider);
   final repo = ref.watch(thoughtRepositoryProvider);
-  if (key.isEmpty) return null;
-  return ThoughtAgent(repository: repo, groqApiKey: key);
+  final embedder = ref.watch(embeddingServiceProvider);
+  if (groqKey.isEmpty) return null;
+  // embedder can be null — agent degrades gracefully to keyword search
+  return ThoughtAgent(
+    repository: repo,
+    groqApiKey: groqKey,
+    embeddingService: embedder!,
+  );
 });
 
-// ── Thoughts list ────────────────────────────────────────────────────────────────
+// ── Thoughts list ─────────────────────────────────────────────────────────────
 
 final thoughtsProvider = StateNotifierProvider<ThoughtsNotifier, List<Thought>>((ref) {
   final repo = ref.watch(thoughtRepositoryProvider);
@@ -75,8 +113,8 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
             role: MessageRole.assistant,
             content:
                 "Hi! I'm ThoughtManager. Tell me anything you want to remember — "
-                "ideas, todos, thoughts — and I'll save and organize it for you. "
-                "You can also ask me to find thoughts, summarize, or reorganize your collection.",
+                "ideas, todos, grocery items, thoughts — and I'll save and find them for you. "
+                "Search works by meaning, not just keywords.",
           ),
         ]);
 
@@ -89,11 +127,9 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
     final agent = _ref.read(agentProvider);
     if (agent == null) return;
 
-    // Add user message
     final userMsg = ChatMessage(role: MessageRole.user, content: text);
     state = [...state, userMsg];
 
-    // Add thinking indicator
     final thinkingMsg = ChatMessage(
       role: MessageRole.assistant,
       content: '',
@@ -103,28 +139,25 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
     _isThinking = true;
 
     try {
-      // Build history (exclude thinking bubble and welcome message for API)
       final history = state
           .where((m) => !m.isThinking && m.role != MessageRole.system)
-          .where((m) => m.id != userMsg.id) // exclude current user msg (added separately in agent)
+          .where((m) => m.id != userMsg.id)
           .toList();
 
       final reply = await agent.run(history, text);
 
-      // Replace thinking with real response
       state = [
         ...state.where((m) => !m.isThinking),
         ChatMessage(role: MessageRole.assistant, content: reply),
       ];
 
-      // Refresh thoughts list (agent may have saved/deleted thoughts)
       _ref.read(thoughtsProvider.notifier).refresh();
     } catch (e) {
       state = [
         ...state.where((m) => !m.isThinking),
         ChatMessage(
           role: MessageRole.assistant,
-          content: 'Error: ${e.toString()}. Check your Groq API key in Settings.',
+          content: 'Error: ${e.toString()}. Check your API keys in Settings.',
         ),
       ];
     } finally {
@@ -133,7 +166,7 @@ class ChatNotifier extends StateNotifier<List<ChatMessage>> {
   }
 
   void clear() {
-    state = [state.first]; // keep welcome message
+    state = [state.first];
   }
 }
 

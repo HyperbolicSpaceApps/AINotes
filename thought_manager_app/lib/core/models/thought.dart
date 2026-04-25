@@ -26,6 +26,9 @@ class Thought extends HiveObject {
   @HiveField(6)
   late DateTime updatedAt;
 
+  @HiveField(7)
+  List<double>? embedding;
+
   Thought({
     String? id,
     required this.title,
@@ -34,6 +37,7 @@ class Thought extends HiveObject {
     String? folder,
     DateTime? createdAt,
     DateTime? updatedAt,
+    this.embedding
   }) {
     this.id = id ?? const Uuid().v4();
     this.tags = tags ?? [];
@@ -47,6 +51,7 @@ class Thought extends HiveObject {
     String? content,
     List<String>? tags,
     String? folder,
+    List<double>? embedding,
   }) {
     return Thought(
       id: id,
@@ -56,6 +61,7 @@ class Thought extends HiveObject {
       folder: folder ?? this.folder,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
+      embedding: this.embedding,
     );
   }
 
@@ -67,6 +73,7 @@ class Thought extends HiveObject {
         'folder': folder,
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
+        'embedding': embedding,
       };
 
   @override

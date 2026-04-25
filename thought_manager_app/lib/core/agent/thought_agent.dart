@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:thought_manager_app/core/embeddings/embedding_service.dart';
 import '../models/thought.dart';
 import '../models/chat_message.dart';
 import '../storage/thought_repository.dart';
@@ -105,13 +106,14 @@ const _tools = [
 
 class ThoughtAgent {
   final ThoughtRepository repository;
+  final EmbeddingService embeddingService;
   final String groqApiKey;
 
   static const _model = 'llama-3.1-8b-instant';
   static const _apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
   static const _maxToolTurns = 5;
 
-  ThoughtAgent({required this.repository, required this.groqApiKey});
+  ThoughtAgent({required this.repository, required this.groqApiKey, required this.embeddingService});
 
   String get _systemPrompt => '''
 You are ThoughtFlow, an intelligent personal thought-taking assistant.
@@ -219,20 +221,20 @@ ${repository.getContextSummary()}
             folder: args['folder'] as String? ?? 'Inbox',
           );
 
-    await repository.save(thought);
+    await repository.save(thought, embedder: embeddingService);
     final action = existing != null ? 'Updated' : 'Saved';
     return '$action thought "${thought.title}" in ${thought.folder} (id: ${thought.id.substring(0, 8)})';
   }
 
-  String _searchThoughts(Map<String, dynamic> args) {
-    final results = repository.search(
-      args['query'] as String,
-      folder: args['folder'] as String?,
-      tag: args['tag'] as String?,
-    );
+  Future<String> _searchThoughts(Map<String, dynamic> args) async {
+    final query = args['query'] as String;
+
+    final queryVec = await embeddingService.embedQuery(query);
+    final results = repository.semanticSearch(queryVec, topK: 8);
+
     if (results.isEmpty) return 'No thoughts found.';
     return 'Found ${results.length} thought(s): '
-        '${results.map((n) => '"${n.title}"[${n.id.substring(0, 8)}]').join(', ')}';
+        '${results.map((n) => '"${n.title}" [${n.id.substring(0, 8)}] tags:${n.tags.join(",")}').join(' | ')}';
   }
 
   String _listThoughts(Map<String, dynamic> args) {
