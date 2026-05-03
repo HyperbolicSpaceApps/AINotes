@@ -116,7 +116,7 @@ class ThoughtAgent {
   ThoughtAgent({required this.repository, required this.groqApiKey, required this.embeddingService});
 
   String get _systemPrompt => '''
-You are ThoughtFlow, an intelligent personal thought-taking assistant.
+You are ThoughtManager, an intelligent personal thought-taking assistant.
 Your job: help the user capture, organize, find, and make sense of their thoughts.
 
 Behavior:

@@ -21,7 +21,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     SettingsScreen(),
   ];
 
-  final _titles = ['ThoughtFlow', 'Thoughts', 'Settings'];
+  final _titles = ['ThoughtManager', 'Thoughts', 'Settings'];
 
   @override
   Widget build(BuildContext context) {
